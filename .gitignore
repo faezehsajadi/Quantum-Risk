@@ -1,0 +1,35 @@
+# ── NVD bulk feeds (download from https://nvd.nist.gov/vuln/data-feeds) ──
+raw/nvdcve-2.0-*.json
+
+# ── EPSS bulk feed (download from https://first.org/epss/data_stats) ──
+raw/epss_scores-*.csv.gz
+
+# ── CISA KEV catalogue (download from https://www.cisa.gov/known-exploited-vulnerabilities-catalog) ──
+raw/known_exploited_vulnerabilities.csv
+
+# ── Derived files produced by scripts ──
+raw/hndl_dataset_with_epss.csv
+results/*
+!results/.gitkeep
+
+# ── Manuscript Word files (binary; track only the .bib) ──
+manuscript/*.docx
+
+# ── Temporary Word/Office lock files ──
+manuscript/~$*
+manuscript/*.tmp
+~$*
+*.tmp
+
+# ── Python ──
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# ── OS ──
+.DS_Store
+Thumbs.db
