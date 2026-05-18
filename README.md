@@ -41,8 +41,8 @@ Vulnerabilities (KEV) catalogue.
 
 ```bash
 # 1. Clone the repository.
-git clone https://github.com/<user>/quantum-risk-index.git
-cd quantum-risk-index
+git clone https://github.com/faezehsajadi/Quantum-Risk.git
+cd Quantum-Risk
 
 # 2. (Recommended) Create a clean Python environment.
 python -m venv .venv
