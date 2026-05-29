@@ -126,7 +126,7 @@ reproduces, among others:
   doi     = {...}
 }
 ```
-
+## The project was submitted to the journal on May 28.
 ## Licence
 
 * Source code (`supplementary/`): **MIT** (see `LICENSE`).
