@@ -1,17 +1,26 @@
 """
 Generate Figures 1 through 8 of the manuscript in a single pass.
 
-    Figure 1 - QRI computation pipeline (Sections 3.1-3.6)
-    Figure 2 - Quantum Factor and HNDL Score corpus composition
-    Figure 3 - Annual distribution of crypto-relevant CVEs
-    Figure 4 - KEV vs non-KEV QRI distribution (violin + box)
-    Figure 5 - KEV percentile analysis (Table 6)
-    Figure 6 - KEV rates by Shor vulnerability and HS tier
-    Figure 7 - Sensitivity of KEV separation to QF and HS specification
-    Figure 8 - QRI versus CVSS and Lorenz curve of QRI
+    Figure 1  - QRI computation pipeline (Sections 3.1-3.6)
+    Figure 2  - Quantum Factor and HNDL Score corpus composition
+                (split into panels 2a and 2b for MDPI two-column layout)
+    Figure 3  - Annual distribution of crypto-relevant CVEs
+    Figure 4  - KEV vs non-KEV QRI distribution (violin + box)
+    Figure 5  - KEV percentile analysis (Table 6)
+    Figure 6  - KEV rates by Shor vulnerability and HS tier
+                (split into panels 6a and 6b for MDPI two-column layout)
+    Figure 7  - Sensitivity of KEV separation to QF and HS specification
+                (split into panels 7a and 7b for MDPI two-column layout)
+    Figure 8  - QRI versus CVSS and Lorenz curve of QRI
+                (split into panels 8a and 8b for MDPI two-column layout)
 
 Input   (in ../raw/):       hndl_dataset.csv
-Output  (in ../figures/):   fig1_*.png ... fig8_*.png
+Output  (in ../figures/):   fig1_*.png/.tiff ... fig8b_*.png/.tiff
+
+Composite figures (2, 6, 7, 8) are emitted as two separate panel files
+each, so they can be placed side-by-side in an MDPI two-column table
+without duplicate (a)/(b) markers inside the plot area. Each figure is
+written to PNG (180 dpi, screen preview) and TIFF (300 dpi, print).
 
 The CSV is parsed once into a Records object that exposes every shared
 derived view (KEV/non-KEV splits, sorted QRI, the global Mann-Whitney
@@ -35,6 +44,7 @@ matplotlib.use("Agg")
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.figure import Figure
 from matplotlib.patches import FancyBboxPatch
 from scipy import stats
 
@@ -45,6 +55,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 DATASET = SCRIPT_DIR.parent / "raw" / "hndl_dataset.csv"
 OUT_DIR = SCRIPT_DIR.parent / "figures"
 DPI = 180
+DPI_TIFF = 300
 RNG_SEED = 42
 
 # Palette held constant across the figure set.
@@ -68,6 +79,25 @@ plt.rcParams.update({
     "savefig.bbox": "tight",
     "savefig.pad_inches": 0.08,
 })
+
+
+# ---------------------------------------------------------------------------
+# Output helper
+# ---------------------------------------------------------------------------
+def save_figure(fig: Figure, base_path: Path) -> None:
+    """Save a figure to both PNG (180 dpi screen) and TIFF (300 dpi print).
+
+    ``base_path`` should have no suffix; both extensions are appended.
+    """
+    base_path = Path(base_path)
+    if base_path.suffix:
+        base_path = base_path.with_suffix("")
+    fig.savefig(base_path.with_suffix(".png"), dpi=DPI)
+    fig.savefig(
+        base_path.with_suffix(".tiff"),
+        dpi=DPI_TIFF,
+        pil_kwargs={"compression": "tiff_lzw"},
+    )
 
 
 # ===========================================================================
@@ -361,21 +391,20 @@ def figure_qri_pipeline(out_path: Path) -> None:
                 fontsize=9.5, color=epss_color, fontstyle="italic",
                 ha="center", va="center")
 
-        plt.savefig(out_path, dpi=200, bbox_inches="tight", facecolor="white")
+        save_figure(fig, out_path)
         plt.close(fig)
 
 
 # ===========================================================================
-# Figure 2 - QF and HS corpus composition
+# Figure 2 - QF and HS corpus composition (split panels)
 # ===========================================================================
-def figure_qf_hs_distribution(r: Records, out_path: Path) -> None:
-    """Composition of the filtered corpus by Quantum Factor (panel a)
-    and HNDL Score (panel b). Horizontal bars handle the long-tailed
-    QF and HS distributions more legibly than a pie chart, which
-    crowds the small Shor / Grover / generic-crypto slices."""
-    fig, (ax_qf, ax_hs) = plt.subplots(1, 2, figsize=(13, 5.5))
+def figure_qf_distribution(r: Records, out_path: Path) -> None:
+    """Panel 2a. Composition of the filtered corpus by Quantum Factor.
+    Horizontal bars handle the long-tailed QF distribution more legibly
+    than a pie chart, which crowds the small Shor / Grover / generic
+    slices."""
+    fig, ax_qf = plt.subplots(figsize=(6.5, 5.5))
 
-    # --- Panel (a): Quantum Factor ---
     qf_values = (1.0, 1.1, 1.2, 1.5)
     qf_counts = [int((r.qf == v).sum()) for v in qf_values]
     qf_labels = (
@@ -403,10 +432,16 @@ def figure_qf_hs_distribution(r: Records, out_path: Path) -> None:
     ax_qf.set_xlabel("Number of CVEs", fontsize=11)
     ax_qf.set_xlim(0, max(qf_counts) * 1.20)
     ax_qf.xaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{int(v):,}"))
-    ax_qf.set_title(f"(a) Quantum Factor (QF) Distribution\nn = {r.n:,}",
-                    fontsize=11, color=C_DARK, pad=10)
 
-    # --- Panel (b): HNDL Score ---
+    plt.tight_layout()
+    save_figure(fig, out_path)
+    plt.close(fig)
+
+
+def figure_hs_distribution(r: Records, out_path: Path) -> None:
+    """Panel 2b. Composition of the filtered corpus by HNDL Score."""
+    fig, ax_hs = plt.subplots(figsize=(6.5, 5.5))
+
     hs_values = range(6)
     hs_counts = [int((r.hs == v).sum()) for v in hs_values]
     hs_labels = ["HS=0\nNo HNDL", "HS=1\nMinor", "HS=2\nChannel",
@@ -428,11 +463,9 @@ def figure_qf_hs_distribution(r: Records, out_path: Path) -> None:
     ax_hs.set_ylabel("Number of CVEs", fontsize=11)
     ax_hs.set_ylim(0, max(hs_counts) * 1.18)
     ax_hs.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{int(v):,}"))
-    ax_hs.set_title(f"(b) HNDL Score (HS) Distribution\nn = {r.n:,}",
-                    fontsize=11, color=C_DARK, pad=10)
 
     plt.tight_layout()
-    plt.savefig(out_path)
+    save_figure(fig, out_path)
     plt.close(fig)
 
 
@@ -492,7 +525,7 @@ def figure_annual_growth(r: Records, out_path: Path) -> None:
                    framealpha=0.92, edgecolor="#CCCCCC")
 
     plt.tight_layout()
-    plt.savefig(out_path)
+    save_figure(fig, out_path)
     plt.close(fig)
 
 
@@ -575,7 +608,7 @@ def figure_kev_violin(r: Records, out_path: Path) -> None:
     )
 
     plt.tight_layout()
-    plt.savefig(out_path)
+    save_figure(fig, out_path)
     plt.close(fig)
 
 
@@ -621,19 +654,16 @@ def figure_kev_percentile(r: Records, out_path: Path) -> None:
     ax.legend(fontsize=10, loc="upper right", framealpha=0.9)
 
     plt.tight_layout()
-    plt.savefig(out_path)
+    save_figure(fig, out_path)
     plt.close(fig)
 
 
 # ===========================================================================
-# Figure 6 - KEV rates by Shor vulnerability and HS tier
+# Figure 6 - KEV rates by Shor vulnerability and HS tier (split panels)
 # ===========================================================================
-def figure_kev_rates(r: Records, out_path: Path) -> None:
-    """Two-panel chi-square visualisation (Section 4.3).
-    Panel (a) compares the CISA KEV rate of Shor-vulnerable (QF = 1.5)
-    CVEs with that of all other crypto CVEs; panel (b) breaks the rate
-    down by HNDL Score tier (HS = 0, HS = 1-3, HS >= 4), the partition
-    used in the body of Section 4.3."""
+def figure_kev_rate_shor(r: Records, out_path: Path) -> None:
+    """Panel 6a. CISA KEV rate of Shor-vulnerable (QF = 1.5) CVEs
+    against all other crypto CVEs (Section 4.3)."""
     is_shor = r.qf == 1.5
     n_shor = int(is_shor.sum())
     n_non_shor = r.n - n_shor
@@ -648,35 +678,42 @@ def figure_kev_rates(r: Records, out_path: Path) -> None:
         [kev_non_shor, n_non_shor - kev_non_shor],
     ]))
 
-    fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(12, 5.5))
+    fig, ax = plt.subplots(figsize=(6.0, 5.5))
 
-    bars_a = ax_a.bar(
+    bars = ax.bar(
         ["Non-Shor\nCrypto CVEs\n(QF < 1.5)",
          "Shor-Vulnerable\nCVEs\n(QF = 1.5)"],
         [rate_non_shor, rate_shor],
         color=[C_BLUE, C_ORANGE], width=0.42,
         edgecolor="white", linewidth=1.5, zorder=2,
     )
-    for bar, rate in zip(bars_a, [rate_non_shor, rate_shor]):
-        ax_a.text(bar.get_x() + bar.get_width() / 2,
-                  bar.get_height() + 0.018,
-                  f"{rate:.3f}%", ha="center", va="bottom",
-                  fontsize=11.5, fontweight="bold", color=C_DARK)
-    ax_a.set_ylabel("CISA KEV Rate (%)", fontsize=11)
-    ax_a.set_ylim(0, max(rate_non_shor, rate_shor) * 1.55)
-    ax_a.annotate(
+    for bar, rate in zip(bars, [rate_non_shor, rate_shor]):
+        ax.text(bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 0.018,
+                f"{rate:.3f}%", ha="center", va="bottom",
+                fontsize=11.5, fontweight="bold", color=C_DARK)
+    ax.set_ylabel("CISA KEV Rate (%)", fontsize=11)
+    ax.set_ylim(0, max(rate_non_shor, rate_shor) * 1.55)
+    ax.annotate(
         f"{rate_shor / rate_non_shor:.2f}\u00d7 higher",
         xy=(1, rate_shor), xytext=(0.45, rate_shor + 0.25),
         fontsize=10, color=C_ORANGE, fontweight="bold",
         arrowprops=dict(arrowstyle="->", color=C_ORANGE, lw=1.5),
     )
-    ax_a.set_title(
-        f"(a) KEV Rate: Shor-Vulnerable vs. Other\n"
+    ax.set_title(
         f"\u03c7\u00b2(1) = {chi_shor.statistic:.3f},  "
         f"p = {chi_shor.pvalue:.3f}",
         fontsize=10.5, color=C_DARK, pad=8,
     )
 
+    plt.tight_layout()
+    save_figure(fig, out_path)
+    plt.close(fig)
+
+
+def figure_kev_rate_hs(r: Records, out_path: Path) -> None:
+    """Panel 6b. CISA KEV rate by HNDL Score tier (HS = 0,
+    HS = 1-3, HS >= 4), the partition used in Section 4.3."""
     hs_groups = (
         ("HS = 0\n(No HNDL)",         r.hs == 0,                C_GREY),
         ("HS = 1\u20133\n(Partial)",  (r.hs >= 1) & (r.hs <= 3), C_BLUE),
@@ -697,43 +734,44 @@ def figure_kev_rates(r: Records, out_path: Path) -> None:
 
     chi_hs = stats.chi2_contingency(np.array(table))
 
-    bars_b = ax_b.bar(range(len(hs_groups)), rates_b, color=colors_b,
-                      width=0.42, edgecolor="white", linewidth=1.5, zorder=2)
-    for bar, rate in zip(bars_b, rates_b):
-        ax_b.text(bar.get_x() + bar.get_width() / 2,
-                  bar.get_height() + 0.025,
-                  f"{rate:.3f}%", ha="center", va="bottom",
-                  fontsize=11.5, fontweight="bold", color=C_DARK)
-    ax_b.set_xticks(range(len(hs_groups)))
-    ax_b.set_xticklabels(labels_b, fontsize=9.5)
-    ax_b.set_ylabel("CISA KEV Rate (%)", fontsize=11)
-    ax_b.set_ylim(0, max(rates_b) * 1.45)
+    fig, ax = plt.subplots(figsize=(6.0, 5.5))
+
+    bars = ax.bar(range(len(hs_groups)), rates_b, color=colors_b,
+                  width=0.42, edgecolor="white", linewidth=1.5, zorder=2)
+    for bar, rate in zip(bars, rates_b):
+        ax.text(bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 0.025,
+                f"{rate:.3f}%", ha="center", va="bottom",
+                fontsize=11.5, fontweight="bold", color=C_DARK)
+    ax.set_xticks(range(len(hs_groups)))
+    ax.set_xticklabels(labels_b, fontsize=9.5)
+    ax.set_ylabel("CISA KEV Rate (%)", fontsize=11)
+    ax.set_ylim(0, max(rates_b) * 1.45)
 
     ratio_extremes = rates_b[2] / rates_b[0]
-    ax_b.annotate(
+    ax.annotate(
         "", xy=(2, rates_b[2]), xytext=(0, rates_b[0]),
         arrowprops=dict(arrowstyle="->", color=C_GREEN, lw=2.2,
                         connectionstyle="arc3,rad=-0.18"),
     )
-    ax_b.text(
+    ax.text(
         1.55, max(rates_b) * 1.18,
         f"HS \u2265 4 is {ratio_extremes:.2f}\u00d7\nthe HS = 0 rate",
         fontsize=9, color=C_GREEN, fontstyle="italic", ha="center",
     )
     p_str = "< 0.001" if chi_hs.pvalue < 1e-3 else f"= {chi_hs.pvalue:.3f}"
-    ax_b.set_title(
-        f"(b) KEV Rate by HNDL Score Tier\n"
+    ax.set_title(
         f"\u03c7\u00b2(2) = {chi_hs.statistic:.3f},  p {p_str}",
         fontsize=10.5, color=C_DARK, pad=8,
     )
 
     plt.tight_layout()
-    plt.savefig(out_path)
+    save_figure(fig, out_path)
     plt.close(fig)
 
 
 # ===========================================================================
-# Figure 7 - Sensitivity analysis (Tables 7 and 8)
+# Figure 7 - Sensitivity analysis (Tables 7 and 8, split panels)
 # ===========================================================================
 QF_SENSITIVITY: tuple[tuple[str, dict[float, float]], ...] = (
     ("Baseline\n(Shor=1.5,\nGrover=1.2)", {1.0: 1.0, 1.1: 1.1, 1.2: 1.2, 1.5: 1.5}),
@@ -759,68 +797,82 @@ def _kev_diff_pct(qri: np.ndarray, kev_mask: np.ndarray) -> float:
     return 100 * (mean_kev - mean_non) / mean_non
 
 
-def figure_sensitivity(r: Records, out_path: Path) -> None:
-    """KEV vs non-KEV mean-QRI separation under alternative QF
-    parameterisations (panel a) and HS functional forms (panel b).
-    Each bar reports the percentage difference in mean QRI between
-    CISA KEV and non-KEV CVEs for one configuration."""
-    diffs_a = []
-    for _, qf_map in QF_SENSITIVITY:
-        qf_remapped = np.array([qf_map[v] for v in r.qf])
-        qri = r.cvss * qf_remapped * (1.0 + r.hs ** 2 / 10.0)
-        diffs_a.append(_kev_diff_pct(qri, r.kev_mask))
-
-    diffs_b = []
-    for _, hs_func in HS_SENSITIVITY:
-        qri = r.cvss * r.qf * hs_func(r.hs)
-        diffs_b.append(_kev_diff_pct(qri, r.kev_mask))
-
-    baseline_diff = diffs_a[0]
-
-    fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(13, 5.8))
-
-    for ax, diffs, scenarios in ((ax_a, diffs_a, QF_SENSITIVITY),
-                                  (ax_b, diffs_b, HS_SENSITIVITY)):
-        colors = [C_ORANGE] + [C_BLUE] * (len(diffs) - 2) + [C_GREY]
-        bars = ax.bar(range(len(diffs)), diffs, color=colors,
-                      edgecolor="white", linewidth=1.2,
-                      zorder=2, width=0.55)
-        ax.axhline(baseline_diff, color=C_ORANGE, linestyle="--",
-                   linewidth=1.5, alpha=0.65,
-                   label=f"Baseline: {baseline_diff:.1f}%")
-        for bar, value in zip(bars, diffs):
-            ax.text(bar.get_x() + bar.get_width() / 2,
-                    bar.get_height() + 0.25,
-                    f"{value:.1f}%", ha="center", va="bottom",
-                    fontsize=9.5, fontweight="bold", color=C_DARK)
-        ax.set_xticks(range(len(diffs)))
-        ax.set_xticklabels([s[0] for s in scenarios], fontsize=8.8)
-        ax.set_ylabel("KEV vs. Non-KEV Mean QRI Difference (%)", fontsize=10.5)
-        ax.set_ylim(min(diffs) - 3, max(diffs) + 4)
-        ax.legend(fontsize=9, loc="upper right")
-
-    ax_a.set_title(
-        "(a) Sensitivity to QF Parameterisation\n"
-        "All 5 scenarios: p < 10\u207b\u2075\u2070",
-        fontsize=10.5, color=C_DARK, pad=8,
-    )
-    ax_b.set_title(
-        "(b) Sensitivity to HS Formula Choice\n"
-        "All 6 formulas: p < 10\u207b\u2075\u00b3",
-        fontsize=10.5, color=C_DARK, pad=8,
-    )
+def _sensitivity_panel(
+    diffs: list[float],
+    scenarios: tuple[tuple[str, object], ...],
+    baseline_diff: float,
+    title: str,
+    out_path: Path,
+) -> None:
+    """Shared rendering routine for the two sensitivity panels."""
+    fig, ax = plt.subplots(figsize=(6.5, 5.8))
+    colors = [C_ORANGE] + [C_BLUE] * (len(diffs) - 2) + [C_GREY]
+    bars = ax.bar(range(len(diffs)), diffs, color=colors,
+                  edgecolor="white", linewidth=1.2,
+                  zorder=2, width=0.55)
+    ax.axhline(baseline_diff, color=C_ORANGE, linestyle="--",
+               linewidth=1.5, alpha=0.65,
+               label=f"Baseline: {baseline_diff:.1f}%")
+    for bar, value in zip(bars, diffs):
+        ax.text(bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 0.25,
+                f"{value:.1f}%", ha="center", va="bottom",
+                fontsize=9.5, fontweight="bold", color=C_DARK)
+    ax.set_xticks(range(len(diffs)))
+    ax.set_xticklabels([s[0] for s in scenarios], fontsize=8.8)
+    ax.set_ylabel("KEV vs. Non-KEV Mean QRI Difference (%)", fontsize=10.5)
+    ax.set_ylim(min(diffs) - 3, max(diffs) + 4)
+    ax.legend(fontsize=9, loc="upper right")
+    ax.set_title(title, fontsize=10.5, color=C_DARK, pad=8)
 
     plt.tight_layout()
-    plt.savefig(out_path)
+    save_figure(fig, out_path)
     plt.close(fig)
 
 
+def figure_sensitivity_qf(r: Records, out_path: Path) -> None:
+    """Panel 7a. KEV vs non-KEV mean-QRI separation under alternative
+    QF parameterisations. Each bar reports the percentage difference
+    in mean QRI between CISA KEV and non-KEV CVEs."""
+    diffs = []
+    for _, qf_map in QF_SENSITIVITY:
+        qf_remapped = np.array([qf_map[v] for v in r.qf])
+        qri = r.cvss * qf_remapped * (1.0 + r.hs ** 2 / 10.0)
+        diffs.append(_kev_diff_pct(qri, r.kev_mask))
+    baseline_diff = diffs[0]
+    _sensitivity_panel(
+        diffs, QF_SENSITIVITY, baseline_diff,
+        "All 5 scenarios: p < 10\u207b\u2075\u2070",
+        out_path,
+    )
+
+
+def figure_sensitivity_hs(r: Records, out_path: Path) -> None:
+    """Panel 7b. KEV vs non-KEV mean-QRI separation under alternative
+    HS functional forms."""
+    qf_baseline = QF_SENSITIVITY[0][1]
+    baseline_qri = r.cvss * np.array([qf_baseline[v] for v in r.qf]) \
+        * (1.0 + r.hs ** 2 / 10.0)
+    baseline_diff = _kev_diff_pct(baseline_qri, r.kev_mask)
+
+    diffs = []
+    for _, hs_func in HS_SENSITIVITY:
+        qri = r.cvss * r.qf * hs_func(r.hs)
+        diffs.append(_kev_diff_pct(qri, r.kev_mask))
+
+    _sensitivity_panel(
+        diffs, HS_SENSITIVITY, baseline_diff,
+        "All 6 formulas: p < 10\u207b\u2075\u00b3",
+        out_path,
+    )
+
+
 # ===========================================================================
-# Figure 8 - QRI vs CVSS bar comparison and Lorenz curve
+# Figure 8 - QRI vs CVSS bar comparison and Lorenz curve (split panels)
 # ===========================================================================
-def figure_cvss_versus_qri(r: Records, out_path: Path) -> None:
-    """KEV separation under plain CVSS and under QRI (panel a) and the
-    Lorenz curve of QRI showing the Pareto concentration (panel b)."""
+def figure_cvss_vs_qri(r: Records, out_path: Path) -> None:
+    """Panel 8a. KEV separation under plain CVSS and under QRI, with
+    ROC-AUC values annotated."""
     u_q, _, _ = r.mw_kev
     auc_qri = u_q / (len(r.kev_qri) * len(r.non_qri))
     u_c, _ = stats.mannwhitneyu(r.kev_cvss, r.non_cvss, alternative="greater")
@@ -830,80 +882,88 @@ def figure_cvss_versus_qri(r: Records, out_path: Path) -> None:
     non_means = [r.non_cvss.mean(), r.non_qri.mean()]
     diffs = [100 * (k - n) / n for k, n in zip(kev_means, non_means)]
 
-    fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(12, 5.5))
+    fig, ax = plt.subplots(figsize=(6.0, 5.5))
 
     x = np.arange(2)
     width = 0.30
-    bars_k = ax_a.bar(x - width / 2, kev_means, width, color=C_ORANGE,
-                      label="CISA KEV mean", zorder=2)
-    bars_n = ax_a.bar(x + width / 2, non_means, width, color=C_BLUE,
-                      alpha=0.72, label="Non-KEV mean", zorder=2)
+    bars_k = ax.bar(x - width / 2, kev_means, width, color=C_ORANGE,
+                    label="CISA KEV mean", zorder=2)
+    bars_n = ax.bar(x + width / 2, non_means, width, color=C_BLUE,
+                    alpha=0.72, label="Non-KEV mean", zorder=2)
     for bar, value in zip(bars_k, kev_means):
-        ax_a.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.15,
-                  f"{value:.2f}", ha="center", fontsize=9.5,
-                  color=C_ORANGE, fontweight="bold")
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.15,
+                f"{value:.2f}", ha="center", fontsize=9.5,
+                color=C_ORANGE, fontweight="bold")
     for bar, value in zip(bars_n, non_means):
-        ax_a.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.15,
-                  f"{value:.2f}", ha="center", fontsize=9.5,
-                  color=C_BLUE, fontweight="bold")
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.15,
+                f"{value:.2f}", ha="center", fontsize=9.5,
+                color=C_BLUE, fontweight="bold")
     for i, diff in enumerate(diffs):
         y_pos = max(kev_means[i], non_means[i]) + 1.5
-        ax_a.annotate(
+        ax.annotate(
             f"+{diff:.1f}%", xy=(i, y_pos - 0.8), xytext=(i + 0.28, y_pos),
             fontsize=10, color=C_GREEN, fontweight="bold",
             arrowprops=dict(arrowstyle="->", color=C_GREEN, lw=1.3),
         )
-    ax_a.set_xticks(x)
-    ax_a.set_xticklabels(["Plain CVSS", "QRI"], fontsize=11)
-    ax_a.set_ylabel("Mean Score Value", fontsize=11)
-    ax_a.set_ylim(0, max(kev_means) * 1.4)
-    ax_a.legend(fontsize=10, loc="upper left")
-    ax_a.set_title(
-        f"(a) KEV vs. Non-KEV Score Comparison\n"
+    ax.set_xticks(x)
+    ax.set_xticklabels(["Plain CVSS", "QRI"], fontsize=11)
+    ax.set_ylabel("Mean Score Value", fontsize=11)
+    ax.set_ylim(0, max(kev_means) * 1.4)
+    ax.legend(fontsize=10, loc="upper left")
+    ax.set_title(
         f"ROC-AUC:  CVSS = {auc_cvss:.3f}  |  QRI = {auc_qri:.3f}",
         fontsize=10.5, color=C_DARK, pad=8,
     )
 
+    plt.tight_layout()
+    save_figure(fig, out_path)
+    plt.close(fig)
+
+
+def figure_lorenz(r: Records, out_path: Path) -> None:
+    """Panel 8b. Lorenz curve of QRI showing the Pareto concentration
+    diagnostic for Q4."""
     cum_pop = np.linspace(0, 1, r.n)
     cum_risk = np.cumsum(r.qri_sorted) / r.qri_sorted.sum()
     gini = 1 - 2 * np.trapezoid(cum_risk, cum_pop)
 
-    ax_b.plot(cum_pop, cum_risk, color=C_BLUE, linewidth=2.2,
-              label=f"QRI Lorenz curve (Gini = {gini:.3f})")
-    ax_b.plot([0, 1], [0, 1], "k--", linewidth=1.2, alpha=0.45,
-              label="Perfect equality")
-    ax_b.fill_between(cum_pop, cum_pop, cum_risk, alpha=0.12, color=C_BLUE)
+    fig, ax = plt.subplots(figsize=(6.0, 5.5))
+
+    ax.plot(cum_pop, cum_risk, color=C_BLUE, linewidth=2.2,
+            label=f"QRI Lorenz curve (Gini = {gini:.3f})")
+    ax.plot([0, 1], [0, 1], "k--", linewidth=1.2, alpha=0.45,
+            label="Perfect equality")
+    ax.fill_between(cum_pop, cum_pop, cum_risk, alpha=0.12, color=C_BLUE)
 
     idx_80 = int(np.searchsorted(cum_risk, 0.80))
     pareto_x = cum_pop[idx_80]
-    ax_b.axvline(pareto_x, color=C_ORANGE, linestyle=":",
-                 linewidth=1.6, alpha=0.8)
-    ax_b.axhline(0.80, color=C_ORANGE, linestyle=":",
-                 linewidth=1.6, alpha=0.8)
-    ax_b.scatter([pareto_x], [0.80], color=C_ORANGE, s=60, zorder=5)
+    ax.axvline(pareto_x, color=C_ORANGE, linestyle=":",
+               linewidth=1.6, alpha=0.8)
+    ax.axhline(0.80, color=C_ORANGE, linestyle=":",
+               linewidth=1.6, alpha=0.8)
+    ax.scatter([pareto_x], [0.80], color=C_ORANGE, s=60, zorder=5)
 
     n_top = max(1, int(0.20 * r.n))
     roi = r.qri_sorted[-n_top:].mean() / r.qri_sorted[:-n_top].mean()
-    ax_b.text(
+    ax.text(
         pareto_x + 0.02, 0.68,
         f"Top {pareto_x * 100:.0f}% of CVEs\n"
         f"\u2192 80% of total QRI\n(ROI = {roi:.2f}\u00d7)",
         fontsize=9, color=C_ORANGE,
     )
 
-    ax_b.set_xlabel("Cumulative proportion of CVEs", fontsize=11)
-    ax_b.set_ylabel("Cumulative proportion of QRI", fontsize=11)
-    ax_b.set_xlim(0, 1)
-    ax_b.set_ylim(0, 1)
-    ax_b.legend(fontsize=10, loc="upper left")
-    ax_b.set_title(
-        f"(b) Lorenz Curve of QRI Distribution\n"
+    ax.set_xlabel("Cumulative proportion of CVEs", fontsize=11)
+    ax.set_ylabel("Cumulative proportion of QRI", fontsize=11)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.legend(fontsize=10, loc="upper left")
+    ax.set_title(
         f"Gini = {gini:.3f};  top 20% score {roi:.2f}\u00d7 higher",
         fontsize=10.5, color=C_DARK, pad=8,
     )
 
     plt.tight_layout()
-    plt.savefig(out_path)
+    save_figure(fig, out_path)
     plt.close(fig)
 
 
@@ -914,24 +974,32 @@ def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # Figure 1 is structural - it does not read the dataset.
-    figure_qri_pipeline(OUT_DIR / "fig1_qri_pipeline.png")
-    print("Wrote fig1_qri_pipeline.png")
+    figure_qri_pipeline(OUT_DIR / "fig1_qri_pipeline")
+    print("Wrote fig1_qri_pipeline.png / .tiff")
 
     # Load the corpus once; every subsequent figure shares the same view.
     r = Records(DATASET)
     print(f"Loaded {r.n:,} records from {DATASET.name}.")
 
     for fn, name in (
-        (figure_qf_hs_distribution, "fig2_qf_hs_distribution.png"),
-        (figure_annual_growth,      "fig3_annual_growth.png"),
-        (figure_kev_violin,         "fig4_kev_vs_nonkev_violin.png"),
-        (figure_kev_percentile,     "fig5_kev_percentile.png"),
-        (figure_kev_rates,          "fig6_kev_rates_by_tier.png"),
-        (figure_sensitivity,        "fig7_sensitivity_analysis.png"),
-        (figure_cvss_versus_qri,    "fig8_cvss_vs_qri_lorenz.png"),
+        # Figure 2: composite split into 2a (QF) and 2b (HS).
+        (figure_qf_distribution,    "fig2a_qf_distribution"),
+        (figure_hs_distribution,    "fig2b_hs_distribution"),
+        (figure_annual_growth,      "fig3_annual_growth"),
+        (figure_kev_violin,         "fig4_kev_vs_nonkev_violin"),
+        (figure_kev_percentile,     "fig5_kev_percentile"),
+        # Figure 6: composite split into 6a (Shor) and 6b (HS tier).
+        (figure_kev_rate_shor,      "fig6a_kev_rate_shor"),
+        (figure_kev_rate_hs,        "fig6b_kev_rate_hs"),
+        # Figure 7: composite split into 7a (QF) and 7b (HS form).
+        (figure_sensitivity_qf,     "fig7a_sensitivity_qf"),
+        (figure_sensitivity_hs,     "fig7b_sensitivity_hs"),
+        # Figure 8: composite split into 8a (CVSS vs QRI) and 8b (Lorenz).
+        (figure_cvss_vs_qri,        "fig8a_cvss_vs_qri"),
+        (figure_lorenz,             "fig8b_lorenz"),
     ):
         fn(r, OUT_DIR / name)
-        print(f"Wrote {name}")
+        print(f"Wrote {name}.png / .tiff")
 
 
 if __name__ == "__main__":
